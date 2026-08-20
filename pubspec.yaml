@@ -35,8 +35,9 @@ dependencies:
   sqlite3_flutter_libs: ^0.5.20
   sqlite3: ^2.9.0
   
-  # Cloud Database
+  # Cloud Database & Environment
   supabase_flutter: ^2.8.2
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -48,8 +49,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # Assets directories will be declared when actual assets are added (Phase 1b+)
-  # assets:
-  #   - assets/icons/
-  #   - assets/backgrounds/
-  #   - assets/animations/
+  assets:
+    - .env

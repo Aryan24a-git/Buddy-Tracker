@@ -7,7 +7,6 @@ class SupabaseService {
   SupabaseClient get _client => Supabase.instance.client;
 
   /// Initializes the Supabase client.
-  /// Keys should be loaded from environment variables in a real app.
   static Future<void> initialize({
     required String url,
     required String anonKey,
@@ -24,12 +23,17 @@ class SupabaseService {
   /// Upserts a user's identity into the cloud `users` table.
   Future<void> upsertUser({
     required String id,
+    required String displayName,
     required String publicKey,
+    String? phoneNumber,
+    String? avatarUrl,
   }) async {
     await _client.from('users').upsert({
       'id': id,
+      'display_name': displayName,
       'public_key': publicKey,
-      'last_active': DateTime.now().toUtc().toIso8601String(),
+      'phone_number': ?phoneNumber,
+      'avatar_url': ?avatarUrl,
     });
   }
 
@@ -37,13 +41,15 @@ class SupabaseService {
 
   /// Adds a verified buddy relationship to the cloud.
   Future<void> addBuddyRelationship({
-    required String user1Id,
-    required String user2Id,
+    required String userId,
+    required String buddyId,
+    String status = 'accepted',
   }) async {
     await _client.from('buddy_relationships').upsert({
-      'user1_id': user1Id,
-      'user2_id': user2Id,
-      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'id': '${userId}_$buddyId',
+      'user_id': userId,
+      'buddy_id': buddyId,
+      'status': status,
     });
   }
 
@@ -70,14 +76,13 @@ class SupabaseService {
       'speed': speed,
       'heading': heading,
       'transport': transport,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
 
   /// Subscribes to realtime updates on the `latest_locations` table for a specific buddy.
   /// Returns a stream of location data payload maps.
   Stream<Map<String, dynamic>> subscribeToBuddyLocation(String buddyId) {
-    // Note: The realtime channel needs to be configured in the Supabase dashboard
-    // for the 'latest_locations' table.
     final streamController = StreamController<Map<String, dynamic>>();
 
     final channel = _client
@@ -113,17 +118,19 @@ class SupabaseService {
   /// Upserts a tracking session to the cloud.
   Future<void> upsertTrackingSession({
     required String sessionId,
+    required String userId,
     required String buddyId,
-    required DateTime startTime,
-    DateTime? endTime,
+    required DateTime startedAt,
+    DateTime? endedAt,
     required bool isActive,
     required String mode,
   }) async {
     await _client.from('tracking_sessions').upsert({
       'id': sessionId,
+      'user_id': userId,
       'buddy_id': buddyId,
-      'start_time': startTime.toUtc().toIso8601String(),
-      'end_time': endTime?.toUtc().toIso8601String(),
+      'started_at': startedAt.toUtc().toIso8601String(),
+      'ended_at': endedAt?.toUtc().toIso8601String(),
       'is_active': isActive,
       'mode': mode,
     });

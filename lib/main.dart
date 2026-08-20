@@ -7,13 +7,35 @@ import 'routing/app_router.dart';
 import 'package:buddy_tracker/providers/service_providers.dart';
 import 'package:buddy_tracker/providers/tracking_providers.dart';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:buddy_tracker/services/supabase_service.dart';
+
 /// Buddy Tracker — app bootstrap.
-///
-/// Phase 1: theme + UI scaffold only.
-/// Phase 2 will add Drift database init.
-/// Phase 5 will add Supabase.initialize() here.
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment credentials from .env
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('Warning: Could not load .env file: $e');
+  }
+
+  // Initialize Supabase with loaded credentials
+  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://xmjumotmtmrisfhhvbhn.supabase.co';
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+  if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+    try {
+      await SupabaseService.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+      );
+      debugPrint('✓ Supabase initialized successfully with live backend');
+    } catch (e) {
+      debugPrint('Error initializing Supabase: $e');
+    }
+  }
 
   // Lock to portrait mode for campus-use UX.
   SystemChrome.setPreferredOrientations([
