@@ -1,0 +1,55 @@
+name: buddy_tracker
+description: "Consent-based college campus buddy location-sharing app with Spider-Sense radar."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^15.1.2
+
+  # UI / fonts (served at runtime; bundled fonts added in Phase 1b)
+  google_fonts: ^6.2.1
+
+  # Utilities
+  intl: ^0.20.2
+  path_provider: ^2.1.2
+  path: ^1.9.0
+  geolocator: ^13.0.1
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
+  uuid: ^4.4.0
+
+  # Database
+  drift: ^2.16.0
+  sqlite3_flutter_libs: ^0.5.20
+  sqlite3: ^2.9.0
+  
+  # Cloud Database
+  supabase_flutter: ^2.8.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.14
+  riverpod_generator: ^2.6.5
+  drift_dev: ^2.16.0
+
+flutter:
+  uses-material-design: true
+  # Assets directories will be declared when actual assets are added (Phase 1b+)
+  # assets:
+  #   - assets/icons/
+  #   - assets/backgrounds/
+  #   - assets/animations/
