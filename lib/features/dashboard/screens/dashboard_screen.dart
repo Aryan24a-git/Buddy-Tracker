@@ -11,6 +11,7 @@ import 'package:buddy_tracker/models/buddy.dart';
 import 'package:buddy_tracker/providers/buddy_providers.dart';
 import 'package:buddy_tracker/providers/tracking_providers.dart';
 import 'package:buddy_tracker/providers/service_providers.dart';
+import 'package:buddy_tracker/services/update_service.dart';
 
 /// Main dashboard screen — design.md §6 Dashboard layout.
 ///
@@ -51,13 +52,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 b.label.toLowerCase().contains(_searchQuery.toLowerCase()))
             .toList();
 
+    final updateAsync = ref.watch(appUpdateCheckProvider);
+
     return Scaffold(
       backgroundColor: AppColors.deepBlack,
       body: SafeArea(
         child: Column(
           children: [
             // ── App bar ─────────────────────────────────────────────────
-              _DashboardAppBar(
+            _DashboardAppBar(
               onAddBuddyTap: () {
                 context.push('/my_qr');
               },
@@ -85,6 +88,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   );
                 }
               },
+            ),
+
+            // ── Update Notification Banner (if newer release exists) ───
+            updateAsync.when(
+              data: (update) => update != null
+                  ? _UpdateBanner(
+                      updateInfo: update,
+                      onUpdateTap: () => ref
+                          .read(updateServiceProvider)
+                          .launchDownload(update.downloadUrl),
+                    )
+                  : const SizedBox.shrink(),
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
 
             // ── Search bar ──────────────────────────────────────────────
@@ -359,6 +376,72 @@ class _EmptyState extends StatelessWidget {
               label: const Text('SCAN QR CODE'),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({
+    required this.updateInfo,
+    required this.onUpdateTap,
+  });
+
+  final AppUpdateInfo updateInfo;
+  final VoidCallback onUpdateTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.spiderRed.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.spiderRed.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.system_update_rounded,
+              color: AppColors.spiderRed, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '⚡ Update Available (v${updateInfo.latestVersion})',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'A newer build is ready on GitHub.',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.whiteMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.spiderRed,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: onUpdateTap,
+            child: Text(
+              'UPDATE',
+              style: AppTextStyles.buttonPrimary.copyWith(fontSize: 11),
+            ),
+          ),
         ],
       ),
     );

@@ -7,6 +7,7 @@ import 'package:buddy_tracker/services/refresh_service.dart';
 import 'package:buddy_tracker/services/tracking_service.dart';
 
 import 'package:buddy_tracker/services/sms_service.dart';
+import 'package:buddy_tracker/services/update_service.dart';
 
 /// Provides the local Drift database instance.
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -56,4 +57,15 @@ final trackingServiceProvider = Provider<TrackingService>((ref) {
   final refreshService = ref.watch(refreshServiceProvider);
   final database = ref.watch(databaseProvider);
   return TrackingService(refreshService, database);
+});
+
+/// Provides the GitHub update checker service.
+final updateServiceProvider = Provider<UpdateService>((ref) {
+  return UpdateService();
+});
+
+/// Asynchronously checks for new updates from GitHub on app startup.
+final appUpdateCheckProvider = FutureProvider<AppUpdateInfo?>((ref) async {
+  final updateService = ref.watch(updateServiceProvider);
+  return updateService.checkForUpdate();
 });
