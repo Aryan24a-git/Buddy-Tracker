@@ -2,7 +2,7 @@ name: buddy_tracker
 description: "Consent-based college campus buddy location-sharing app with Spider-Sense radar."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.11.1

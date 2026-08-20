@@ -144,6 +144,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         child: SizedBox(
                           height: 220,
                           child: MapPlaceholderWidget(
+                            buddies: buddies,
                             lastSyncTime: DateTime.now()
                                 .subtract(const Duration(minutes: 3)),
                           ),

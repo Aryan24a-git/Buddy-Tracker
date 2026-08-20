@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:buddy_tracker/core/theme/theme.dart';
 import 'package:buddy_tracker/core/utils/freshness.dart';
+import 'package:buddy_tracker/models/buddy.dart';
 
 /// Campus map preview widget styled with tactical dark theme aesthetics.
 class MapPlaceholderWidget extends StatelessWidget {
-  const MapPlaceholderWidget({super.key, this.lastSyncTime});
+  const MapPlaceholderWidget({
+    super.key,
+    this.lastSyncTime,
+    this.buddies = const [],
+  });
 
   final DateTime? lastSyncTime;
+  final List<BuddyModel> buddies;
 
   @override
   Widget build(BuildContext context) {
@@ -23,36 +29,18 @@ class MapPlaceholderWidget extends StatelessWidget {
             size: Size.infinite,
           ),
 
-          // ── Mock marker: YOU ─────────────────────────────────────────
+          // ── Real marker: YOU ─────────────────────────────────────────
           const Center(
-            child: _MockMarker(
+            child: _BuddyMarker(
               label: 'YOU',
               color: AppColors.electricBlue,
               isYou: true,
             ),
           ),
 
-          // ── Mock marker: Rahul ────────────────────────────────────────
-          const Positioned(
-            top: 60,
-            right: 80,
-            child: _MockMarker(
-              label: 'Rahul',
-              color: AppColors.webBlue,
-              distanceLabel: '320 m',
-            ),
-          ),
-
-          // ── Mock marker: Priya ───────────────────────────────────────
-          const Positioned(
-            bottom: 70,
-            left: 60,
-            child: _MockMarker(
-              label: 'Priya',
-              color: AppColors.webBlue,
-              distanceLabel: '470 m',
-            ),
-          ),
+          // ── Dynamic markers for connected buddies ────────────────────
+          for (int i = 0; i < buddies.length && i < 4; i++)
+            _buildBuddyPosition(context, buddies[i], i),
 
           // ── CAMPUS MAP label ─────────────────────────────────────────
           Positioned(
@@ -125,12 +113,38 @@ class MapPlaceholderWidget extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildBuddyPosition(BuildContext context, BuddyModel buddy, int index) {
+    // Relative layout offsets for up to 4 buddies around the center
+    final offsets = [
+      const Alignment(0.6, -0.5),
+      const Alignment(-0.6, 0.5),
+      const Alignment(-0.5, -0.6),
+      const Alignment(0.5, 0.6),
+    ];
+
+    final align = offsets[index % offsets.length];
+
+    String? distanceText;
+    if (buddy.lastLocation != null) {
+      distanceText = '${buddy.lastLocation!.accuracy?.round() ?? 0}m acc';
+    }
+
+    return Align(
+      alignment: align,
+      child: _BuddyMarker(
+        label: buddy.displayName,
+        color: AppColors.webBlue,
+        distanceLabel: distanceText,
+      ),
+    );
+  }
 }
 
 // ── Private helpers ─────────────────────────────────────────────────────────
 
-class _MockMarker extends StatelessWidget {
-  const _MockMarker({
+class _BuddyMarker extends StatelessWidget {
+  const _BuddyMarker({
     required this.label,
     required this.color,
     this.distanceLabel,
