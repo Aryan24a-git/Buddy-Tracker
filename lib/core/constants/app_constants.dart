@@ -6,7 +6,7 @@ class AppConstants {
   AppConstants._();
 
   // ── Version & GitHub Updates ─────────────────────────────────────────────
-  static const String appVersion = '1.0.1';
+  static const String appVersion = '1.0.0';
   static const String githubRepo = 'Aryan24a-git/Buddy-Tracker';
   static const String githubLatestReleaseApi =
       'https://api.github.com/repos/Aryan24a-git/Buddy-Tracker/releases/latest';
@@ -40,7 +40,4 @@ class AppConstants {
 
   // ── QR / Pairing ─────────────────────────────────────────────────────────
   static const int pairingQrVersion = 1;
-
-  // ── SMS packet ───────────────────────────────────────────────────────────
-  static const String smsLocationPrefix = 'BT:';
 }

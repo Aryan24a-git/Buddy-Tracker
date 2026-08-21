@@ -31,19 +31,23 @@ If something in a build prompt conflicts with these docs, follow the docs and fl
 ## 3. Hard Product Rules (non-negotiable)
 
 - **Local-first**: UI always shows cached/local data before any network call.
-- **No automatic tracking on open.** Cached snapshot only, until user refreshes.
+- **No automatic tracking on open.** Cached snapshot only, until user enables sharing.
 - **Manual refresh = one-shot.** Request → response → stop. No polling loops.
-- **Active tracking = explicit opt-in per friend**, ~15 second interval (configurable constant,
-  never hardcoded as 1 second or "always on").
-- **App minimized/backgrounded → tracking stops immediately.** Never silently resume tracking
-  on reopen; reopen always shows cached state with tracking OFF.
-- **Dual transport**: Internet → Supabase Realtime; Data OFF + SMS available → SMS fallback;
-  neither available → cached-only, clearly marked stale. Never claim the app "works with no
-  network at all."
-- **Consent everywhere**: buddy relationships only via explicit QR pairing; tracking only with
-  target visibility (the tracked device must be able to tell it is being tracked); no hidden
-  location access.
-- **Do not build anything on the "What NOT to Build in V1" list** (see architecture.md §9)
+- **Continuous sharing = explicit opt-in via Settings toggle**, ~15 second interval
+  (configurable constant, never hardcoded as 1 second or "always on").
+- **Foreground service**: location sharing continues in background via Android
+  foreground service with persistent notification.
+- **Stop sharing toggle**: global and immediate, available in Settings and via
+  the privacy indicator.
+- **Internet-only transport**: Supabase Realtime for location sync. When offline,
+  last-known location is cached locally and marked stale. No SMS fallback.
+- **Instant mutual pairing**: QR scan or manual ID entry creates both directions
+  of the buddy relationship atomically. No pending/accept flow. Informational
+  in-app notification only.
+- **Consent everywhere**: buddy relationships only via explicit QR/ID pairing;
+  sharing only with target visibility (privacy indicator); no hidden location access.
+- **(0,0) guard**: GPS coordinates (0,0) must never be treated as valid location.
+- **Do not build anything on the "What NOT to Build in V1" list** (see architecture.md §13)
   unless the user explicitly asks to expand scope.
 
 ## 4. Coding Standards
@@ -85,7 +89,6 @@ If something in a build prompt conflicts with these docs, follow the docs and fl
 
 - Never log or print raw phone numbers, GPS coordinates, or pairing tokens to console/analytics.
 - Never add a backdoor "admin can see all users' locations" feature.
-- SMS location packets: implement the integrity check (CRC) described in architecture.md, but
-  do not claim it provides authentication — pairing keys handle authentication.
-- Any permission request (Location, SMS) must be paired with an in-UI explanation string, per
+- Any permission request (Location) must be paired with an in-UI explanation string, per
   design.md's empty/permission states.
+- Two-step permission request: Fine Location first, then Background Location separately.

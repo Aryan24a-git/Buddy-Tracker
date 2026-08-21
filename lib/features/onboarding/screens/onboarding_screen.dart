@@ -46,7 +46,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       final shortCode = _generateShortCode();
       final publicKey = 'pub_${shortCode}_${DateTime.now().millisecondsSinceEpoch}';
 
-      // Save locally
+      // Save locally first (local-first per architecture.md)
       final db = ref.read(databaseProvider);
       await db.usersDao.insertOrUpdateUser(
         User(
@@ -55,22 +55,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           publicKey: publicKey,
         ),
       );
+      debugPrint('OnboardingScreen: Local user created: id=$shortCode, name=$name');
 
-      // Upsert to cloud
-      final supabaseService = ref.read(supabaseServiceProvider);
-      await supabaseService.upsertUser(
-        id: shortCode,
-        displayName: name,
-        publicKey: publicKey,
-      );
+      // Upsert to Supabase cloud
+      try {
+        final supabaseService = ref.read(supabaseServiceProvider);
+        await supabaseService.upsertUser(
+          id: shortCode,
+          displayName: name,
+          publicKey: publicKey,
+        );
+        debugPrint('OnboardingScreen: Cloud user synced successfully');
+      } catch (cloudErr) {
+        // Log but don't block — local-first means we continue even if cloud fails
+        debugPrint('OnboardingScreen: Cloud sync failed (non-blocking): $cloudErr');
+      }
 
       if (mounted) {
         context.go(AppRoutes.dashboard);
       }
     } catch (e) {
+      debugPrint('OnboardingScreen: FATAL error creating profile: $e');
       if (mounted) {
         setState(() {
-          _error = 'Failed to create profile. Please try again.';
+          _error = 'Failed to create profile: $e';
           _isLoading = false;
         });
       }

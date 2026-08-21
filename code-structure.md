@@ -19,7 +19,7 @@ buddy_tracker/
 │   │   ├── errors/           # typed failures (LocationError, TransportError, PairingError...)
 │   │   ├── utils/            # haversine distance, formatting, id/token helpers
 │   │   ├── theme/            # color system, typography, spacing, component themes
-│   │   └── security/         # key generation/storage, CRC, pairing-token crypto
+│   │   └── security/         # key generation/storage, pairing-token crypto
 │   │
 │   ├── models/
 │   │   ├── user.dart
@@ -29,17 +29,18 @@ buddy_tracker/
 │   │
 │   ├── database/              # Drift / local SQLite
 │   │   ├── app_database.dart
-│   │   ├── tables/            # users, buddies, last_locations, tracking_sessions,
-│   │   │                      # pending_requests, settings
+│   │   ├── tables/            # users, buddies, last_locations, tracking_sessions, settings
 │   │   └── daos/
 │   │
 │   ├── services/
-│   │   ├── location_service.dart    # LocationManager
-│   │   ├── network_service.dart     # connectivity detection
-│   │   ├── sms_service.dart         # SMS transport (Phase 9)
-│   │   ├── supabase_service.dart    # Supabase client + realtime
-│   │   ├── pairing_service.dart     # PairingManager (QR)
-│   │   └── tracking_service.dart    # TrackingManager + TransportManager glue
+│   │   ├── location_service.dart       # LocationManager (GPS + position stream)
+│   │   ├── connectivity_service.dart   # Network state monitoring
+│   │   ├── supabase_service.dart       # Supabase client + realtime + notifications
+│   │   ├── transport_service.dart      # Internet-only transport (SMS removed)
+│   │   ├── pairing_service.dart        # PairingManager (QR + manual ID)
+│   │   ├── tracking_service.dart       # TrackingManager (continuous sharing)
+│   │   ├── refresh_service.dart        # RefreshManager (one-shot sync)
+│   │   └── update_service.dart         # GitHub release checker
 │   │
 │   ├── features/
 │   │   ├── onboarding/        # splash, create profile, permissions
@@ -47,8 +48,8 @@ buddy_tracker/
 │   │   ├── map/                # MapLibre widget, markers, camera, radar rings
 │   │   ├── buddies/            # buddy list, friend profile, search
 │   │   ├── pairing/            # my QR, scan QR, add-buddy flow
-│   │   ├── profile/            # user profile / settings
-│   │   ├── tracking/           # active tracking screen, target status card
+│   │   ├── profile/            # user profile / settings (incl. stop-sharing toggle)
+│   │   ├── tracking/           # buddy view screen, target status card
 │   │   └── radar/              # spider-sense radar visual component
 │   │
 │   ├── providers/              # Riverpod providers wiring services → UI
@@ -72,12 +73,12 @@ buddy_tracker/
 |------------------------|---------------------|
 | `features/`             | UI layer |
 | `providers/`            | Bridges UI ↔ Application layer |
-| `services/`             | Application + Transport engine (`TransportManager` lives in `tracking_service.dart` or a dedicated `transport_manager.dart` once it grows) |
-| `services/location_service.dart` | Location engine |
+| `services/`             | Application + Transport engine |
+| `services/location_service.dart` | Location engine (GPS + stream) |
+| `services/connectivity_service.dart` | Network monitoring |
 | `database/`             | Local persistence (Drift/SQLite) |
-| `supabase_service.dart` | Cloud/Realtime transport |
-| `sms_service.dart`      | SMS transport |
-| `core/security/`        | Pairing keys, CRC, auth |
+| `supabase_service.dart` | Cloud/Realtime transport + notifications |
+| `core/security/`        | Pairing keys, auth |
 
 ## 3. Naming Conventions
 
@@ -93,19 +94,19 @@ buddy_tracker/
 
 - `main.dart` — app bootstrap, Riverpod `ProviderScope`, Supabase init, routing entry.
 - `database/app_database.dart` — Drift database definition, migrations.
-- `services/tracking_service.dart` — owns the tracking state machine and lifecycle hook
-  (`handleAppLifecycle`) that enforces "minimize = stop."
+- `services/tracking_service.dart` — owns the continuous location sharing loop.
+  Runs via foreground service for background operation.
 - `services/supabase_service.dart` — Supabase client, realtime channel subscriptions, upserts to
-  `latest_locations`.
-- `services/sms_service.dart` — builds/parses the compact location packet, sends/receives SMS,
-  CRC check (Phase 9 only — do not build early).
+  `latest_locations`, notifications.
+- `services/connectivity_service.dart` — monitors network state, triggers cache mode on disconnect.
+- `services/location_service.dart` — GPS, position stream, (0,0) guard.
 - `core/utils/distance.dart` — Haversine implementation, single source of truth for distance calc.
 
 ## 5. Testing Layout
 
 `test/` mirrors `lib/` (e.g. `test/services/tracking_service_test.dart`). Prioritize unit tests for
-`core/utils` (distance/freshness), `services/tracking_service.dart` (state transitions,
-minimize→stop rule), and `services/transport` selection logic — these are the rules most likely to
+`core/utils` (distance/freshness), `services/tracking_service.dart` (sharing state transitions),
+and `services/location_service.dart` ((0,0) guard) — these are the rules most likely to
 regress silently.
 
 ## 6. What Not to Add

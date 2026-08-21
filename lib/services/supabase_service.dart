@@ -175,4 +175,31 @@ class SupabaseService {
       'mode': mode,
     });
   }
+
+  // ── Notifications Table ─────────────────────────────────────────────────
+
+  /// Sends an in-app notification to a user (informational only, non-blocking).
+  Future<void> sendNotification({
+    required String toUserId,
+    required String fromUserId,
+    required String message,
+  }) async {
+    await _client.from('notifications').insert({
+      'to_user_id': toUserId,
+      'from_user_id': fromUserId,
+      'message': message,
+    });
+  }
+
+  /// Fetches unread notifications for the current user.
+  Future<List<Map<String, dynamic>>> getUnreadNotifications(String userId) async {
+    final response = await _client
+        .from('notifications')
+        .select()
+        .eq('to_user_id', userId)
+        .eq('read', false)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
 }
+

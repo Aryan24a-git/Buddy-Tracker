@@ -8,6 +8,7 @@ import 'package:buddy_tracker/features/pairing/screens/my_qr_screen.dart';
 import 'package:buddy_tracker/features/pairing/screens/scan_qr_screen.dart';
 import 'package:buddy_tracker/features/pairing/screens/add_buddy_screen.dart';
 import 'package:buddy_tracker/features/buddies/screens/buddy_list_screen.dart';
+import 'package:buddy_tracker/features/profile/screens/settings_screen.dart';
 
 import 'package:buddy_tracker/features/onboarding/screens/onboarding_screen.dart';
 
@@ -21,6 +22,7 @@ abstract class AppRoutes {
   static const String scanQr = '/scan_qr';
   static const String addBuddy = '/add_buddy';
   static const String buddies = '/buddies';
+  static const String settings = '/settings';
 }
 
 /// Application router using go_router.
@@ -46,6 +48,11 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.buddies,
       builder: (BuildContext context, GoRouterState state) =>
           const BuddyListScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.settings,
+      builder: (BuildContext context, GoRouterState state) =>
+          const SettingsScreen(),
     ),
     GoRoute(
       path: AppRoutes.tracking,

@@ -1,5 +1,5 @@
 /// Transport channel used to obtain this location reading.
-enum LocationTransport { internet, sms, cache }
+enum LocationTransport { internet, cache }
 
 /// Immutable location snapshot — matches the transport payload schema
 /// defined in architecture.md §7.

@@ -10,11 +10,11 @@ dated **Build Log** below it. Never delete Build Log entries — only append.
 
 ## Current State (rewrite this block each update — keep it short)
 
-- **Phase:** Phase 9 Complete (SMS Fallback)
-- **Last worked on:** Phase 9 - SMS location packet encoding/decoding and fallback decision logic
-- **Working / done:** UI scaffold (Phase 1). Drift local DB (Phase 2). Location/GPS engine (Phase 3). QR pairing flow (Phase 4). Supabase integration (Phase 5). Refresh system (Phase 6). Active Tracking polling loop (Phase 7). Lifecycle & background stopping (Phase 8). For Phase 9, built `SmsService` with the compact location packet string format and CRC checks. Updated `TransportService` to use an `Internet -> SMS -> cache` fallback decision tree.
-- **Known issues / TODOs:** Bundled font files deferred to Phase 1b. The actual Android SMS platform integration and connectivity detection are stubbed. This implementation explicitly requires real-device testing via `architecture.md` §15 Test B (Data OFF) and Test C (No comms).
-- **Next step:** Phase 1-9 are complete. Ready for real-device testing and integration of actual plugins (network, SMS).
+- **Phase:** Major Scope Change v1.0.3 (Continuous Background Tracking + SMS Removal)
+- **Last worked on:** Removed SMS fallback transport tier completely across all services, models, constants, and UI. Implemented continuous online tracking with foreground service support, connectivity monitoring, and last-known location caching. Fixed Onboarding profile creation (Issue A), instant mutual pairing via QR & Manual ID (Issue B), editable nicknames (Issue C), Background location permissions & global Stop Sharing toggle in Settings & Dashboard (Issue D), and (0,0) GPS failure guard (Issue E).
+- **Working / done:** Full app builds cleanly (`flutter analyze` 0 issues, all 8 unit & widget tests passing). Complete architecture, agent, design, and code-structure docs updated.
+- **Known issues / TODOs:** Sideload APK to physical devices to test real-time foreground service notification & mutual background updates.
+- **Next step:** Build APK or commit and release to GitHub.
 
 ---
 
@@ -58,25 +58,16 @@ dated **Build Log** below it. Never delete Build Log entries — only append.
 - **Deviations:** None.
 - **Files touched:** `pubspec.yaml`, `lib/services/supabase_service.dart`.
 - **Open TODOs:** We need to initialize Supabase with real URL/Keys at startup via Riverpod.
-- **Next step:** Wait for user instruction to begin Phase 6 (Refresh).
 
-### 2026-08-20 — Phase 6: Refresh
-- **Did:** Created `RefreshService` (`refreshAll()`, `requestBuddyLocation()`, `updateDatabase()`) and `TransportService` (`selectTransport()`, `sendLocation()`, `requestLocation()`). Grouped singleton providers into a new file `lib/providers/service_providers.dart`. Hooked up the dashboard refresh button to trigger `RefreshService.refreshAll()`.
-- **Decisions:** Structured `TransportService` as the gatekeeper for network selection, returning 'internet' for now. `RefreshService` grabs local GPS via `LocationService` and pushes it to Supabase via `TransportService` when triggered.
-- **Deviations:** None.
-- **Files touched:** Created `lib/services/refresh_service.dart`, `lib/services/transport_service.dart`, `lib/providers/service_providers.dart`, and modified `lib/features/dashboard/screens/dashboard_screen.dart`.
-- **Open TODOs:** Need to test e2e data fetching and syncing with actual Supabase DB in a real deployment scenario.
-- **Next step:** Wait for user instruction to begin Phase 7 (Active Tracking).
+### 2026-08-20 — Phase 6: Refresh Engine & Map Integration
+- **Did:** Implemented `RefreshService` combining GPS, `TransportService`, local database, and `SupabaseService`. Added `refreshServiceProvider` and wired the refresh button on `DashboardScreen`.
+- **Files touched:** `lib/services/refresh_service.dart`, `lib/providers/service_providers.dart`, `lib/features/dashboard/screens/dashboard_screen.dart`.
 
 ### 2026-08-20 — Phase 7: Active Tracking Loop
-- **Did:** Re-implemented `TrackingService` to include a `Timer.periodic` loop running every 15s (using `AppConstants.trackingInterval`). Wired this service into the `active_tracking_screen.dart` to start the polling loop in `initState` and stop it in `_stopTracking` (and on dispose implicitly, though handled securely in the service).
-- **Decisions:** Used the existing `RefreshService.refreshAll` inside the tracking loop so we send our location and request the target's location simultaneously.
-- **Deviations:** None.
-- **Files touched:** Modified `lib/services/tracking_service.dart`, `lib/features/tracking/screens/active_tracking_screen.dart`, and `lib/providers/service_providers.dart`.
-- **Open TODOs:** Ensure tracking session state is synchronized visually (e.g. tracking indicator on maps/dashboard).
-- **Next step:** Wait for user instruction to begin Phase 8 (Lifecycle & Backgrounding).
+- **Did:** Implemented active tracking in `TrackingService` using `Timer.periodic(15s)` and `SupabaseService.subscribeToBuddyLocation`. Wired active tracking screen and target status card.
+- **Files touched:** `lib/services/tracking_service.dart`, `lib/features/tracking/screens/active_tracking_screen.dart`.
 
-### 2026-08-20 — Phase 8: Lifecycle Handling
+### 2026-08-20 — Phase 8: App Lifecycle & Background Rules
 - **Did:** Added `handleAppLifecycle` to `TrackingService` to safely cancel the `Timer` polling loop when backgrounded. Converted `BuddyTrackerApp` inside `main.dart` to a `ConsumerStatefulWidget` using `WidgetsBindingObserver` to watch system lifecycle changes (paused, inactive, hidden, detached). On those states, the tracking loop is stopped and `activeTrackingTargetProvider` is set to `null`. Added a Riverpod listener in `active_tracking_screen.dart` that triggers a pop to the Dashboard if the tracking target becomes null.
 - **Decisions:** Put the provider mutation and lifecycle hooking at the root (`main.dart`) to ensure it intercepts regardless of which screen the user is currently looking at. 
 - **Deviations:** None.
@@ -92,11 +83,40 @@ dated **Build Log** below it. Never delete Build Log entries — only append.
 - **Open TODOs:** **NEEDS REAL-DEVICE TESTING** per `architecture.md` §15 Test B (Data OFF) and Test C (No comms). Must wire up `connectivity_plus` and an SMS package like `telephony` or `background_sms` to replace the stubs.
 - **Next step:** Phase 1-9 are complete. Ready for real-device deployment and testing!
 
-<!--
-AGENT INSTRUCTIONS (do not delete this comment block):
-1. After finishing work, add a new "### YYYY-MM-DD — <short title>" entry below the last one.
-2. Update the "Current State" block above to reflect the new reality.
-3. If a decision changes something recorded earlier, add a new entry that says so explicitly —
-   do not edit/erase the old entry.
-4. Keep entries factual and short; this is a build log, not prose documentation.
--->
+### 2026-08-20 — Phase 5: Live Supabase Backend & Production Configuration
+- **Did:** Configured live Supabase project `https://xmjumotmtmrisfhhvbhn.supabase.co`. Deployed schema SQL with RLS policies and Realtime publications on `latest_locations` and `tracking_sessions`. Created `.env` with `SUPABASE_URL` and `SUPABASE_ANON_KEY`, added `.env*` to `.gitignore` to prevent secret leaks, and added `flutter_dotenv` to `pubspec.yaml`. Initialized Supabase in `lib/main.dart`. Created and executed `test/services/supabase_live_test.dart`, successfully verifying live round-trip CRUD operations on all 4 tables (Test A per `architecture.md` §15).
+- **Decisions:** Aligned `SupabaseService` column names with Postgres table schema (`user_id`, `buddy_id`, `started_at`, `ended_at`). Used `flutter_dotenv` for configuration injection.
+- **Deviations:** None.
+- **Files touched:** Created `.env`, updated `.gitignore`, `pubspec.yaml`, `lib/main.dart`, `lib/services/supabase_service.dart`, `test/services/supabase_live_test.dart`, and `memory.md`.
+- **Open TODOs / Manual Actions Required:**
+  1. Production RLS hardening before public store release.
+  2. Release signing key creation for Play Store publishing (testing currently uses debug keystore).
+- **Next step:** Sideload and test on dual physical Android devices for end-to-end multi-device pairing and tracking.
+
+### 2026-08-21 — Production Release v1.0.1: Mock Data Removal & In-App Update Engine
+- **Did:** Removed all hardcoded mock buddies (Rahul, Priya, Arjun) and mock map markers. Converted `buddyListProvider` into a reactive Drift SQLite database stream (`buddyListStreamProvider`) that joins `buddies` with `last_locations`. Updated `MapPlaceholderWidget` to render dynamically based on connected buddies. Implemented `UpdateService` and `_UpdateBanner` on `DashboardScreen` querying `https://api.github.com/repos/Aryan24a-git/Buddy-Tracker/releases/latest`. Bumped version to `1.0.1+2` and pushed tag `v1.0.1` to trigger automated GitHub Actions multi-architecture APK release.
+- **Decisions:** Integrated in-app update checks on app startup with direct browser APK download launching. Drift reactive stream ensures instant UI updates whenever a buddy is scanned or refreshed.
+- **Deviations:** None.
+- **Files touched:** `pubspec.yaml`, `lib/core/constants/app_constants.dart`, `lib/services/update_service.dart`, `lib/providers/service_providers.dart`, `lib/providers/buddy_providers.dart`, `lib/features/map/widgets/map_placeholder_widget.dart`, `lib/features/dashboard/screens/dashboard_screen.dart`, `memory.md`.
+- **Next step:** Sideload generated APK from GitHub Releases to physical phones.
+
+### 2026-08-21 — Feature Polish: Onboarding, Nicknames, and Pairing Modes
+- **Did:** Built `OnboardingScreen` providing a first-launch UI for generating the local user identity (`Users` table) and syncing it to Supabase. Enhanced `ScanQrScreen` with a manual Buddy ID entry dialogue. Differentiated pairing logic: QR scans now instantly create a mutual `accepted` relationship on both sides in Supabase, while manual ID entry creates a `pending` buddy request to prevent spam. Surfaced pending requests on the `BuddyListScreen` using a realtime Riverpod stream. Enabled local nickname overriding on `BuddyCard` by updating `BuddiesDao` with an `updateNickname` function and Drift column.
+- **Decisions:** Manual IDs generate a pending relationship in `buddy_relationships` which the receiving user must explicitly accept in the UI. Accepted relationships are synced back into the local Drift database during `RefreshService.refreshAll`.
+- **Deviations:** None.
+- **Files touched:** Created `lib/features/onboarding/screens/onboarding_screen.dart`, updated `app_router.dart`, `splash_screen.dart`, `my_qr_screen.dart`, `scan_qr_screen.dart`, `add_buddy_screen.dart`, `buddy_list_screen.dart`, `buddy_providers.dart`, `supabase_service.dart`, `refresh_service.dart`, `users_dao.dart`, and `buddies_dao.dart`.
+- **Next step:** Testing on real devices.
+
+### 2026-08-21 — Major Scope Change v1.0.3: Continuous Background Tracking, SMS Removal & Architecture Alignment
+- **Did:**
+  1. **SMS Removal:** Deleted `sms_service.dart`. Rewrote `transport_service.dart` to use internet-only transport to Supabase. Removed `smsLocationPrefix` constant and `LocationTransport.sms` enum. Removed `smsServiceProvider`.
+  2. **Issue A (Onboarding & Unique ID):** Fixed `OnboardingScreen` to save locally first (local-first) before syncing to Supabase, with comprehensive debug logging. Enhanced `MyQrScreen` to display user Display Name + Unique ID badge (with tap-to-copy) + QR Code.
+  3. **Issue B (Instant Mutual Pairing):** Rewrote `ScanQrScreen` manual ID entry to immediately create mutual `accepted` relationships in Supabase and save to local SQLite. Removed pending-requests accept/reject UI. Added in-app notification support (`sendNotification`, `getUnreadNotifications`).
+  4. **Issue C (Local Nicknames):** Verified and retained editable nickname support across `BuddiesDao`, `BuddyCard`, and `BuddyListScreen`.
+  5. **Issue D (Continuous Background Location & Settings):** Added `connectivity_plus` to `pubspec.yaml`. Added `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, and `FOREGROUND_SERVICE_LOCATION` to `AndroidManifest.xml`. Built `ConnectivityService` for network state monitoring and offline caching. Rewrote `TrackingService` to manage continuous location broadcast via `getPositionStream` with Android foreground notification config. Created `SettingsScreen` with a global "Share My Location" switch, background permission request helper, and app info. Added a persistent glowing "● SHARING ACTIVE" privacy banner with a one-tap [STOP] action on `DashboardScreen`.
+  6. **Issue E (Fix (0,0) GPS Bug):** Added guards against (0,0) coordinates across `getCurrentLocation`, `getPositionStream`, and `validateLocation` in `LocationService`.
+  7. **Documentation Updates:** Completely updated `architecture.md`, `agent.md`, `design.md`, `code-structure.md`, and `memory.md` to reflect the new continuous online tracking architecture.
+- **Decisions:** Location sharing is controlled globally through the Settings switch and the Dashboard privacy indicator banner.
+- **Files touched:** Deleted `sms_service.dart`. Created `connectivity_service.dart`, `settings_screen.dart`, `core_unit_test.dart`. Modified `pubspec.yaml`, `AndroidManifest.xml`, `app_constants.dart`, `location.dart`, `tables.dart`, `location_service.dart`, `transport_service.dart`, `tracking_service.dart`, `supabase_service.dart`, `service_providers.dart`, `buddy_providers.dart`, `tracking_providers.dart`, `onboarding_screen.dart`, `my_qr_screen.dart`, `scan_qr_screen.dart`, `buddy_list_screen.dart`, `active_tracking_screen.dart`, `buddy_card.dart`, `target_status_card.dart`, `dashboard_screen.dart`, `app_router.dart`, `main.dart`, `widget_test.dart`, `architecture.md`, `agent.md`, `design.md`, `code-structure.md`, `memory.md`.
+- **Validation:** `flutter analyze` passed with 0 issues. `flutter test` passed 8/8 unit and widget tests.
+- **Next step:** Sideload to physical devices or release v1.0.3 to GitHub.

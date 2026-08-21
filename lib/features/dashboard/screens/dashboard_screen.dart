@@ -55,6 +55,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final updateAsync = ref.watch(appUpdateCheckProvider);
 
+    final isSharing = ref.watch(isSharingLocationProvider);
+    final userAsync = ref.watch(currentUserProvider);
+    final myUserId = userAsync.value?.id ?? 'self';
+
     return Scaffold(
       backgroundColor: AppColors.deepBlack,
       body: SafeArea(
@@ -66,7 +70,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 context.push('/my_qr');
               },
               onSettingsTap: () {
-                context.push('/buddies');
+                context.push('/settings');
               },
               onRefreshTap: () async {
                 final messenger = ScaffoldMessenger.of(context);
@@ -75,7 +79,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 
                 if (!hasPermission || !mounted) return;
 
-                // Phase 6: Call RefreshManager
+                // Call RefreshManager
                 messenger.showSnackBar(
                   const SnackBar(
                     content: Text('⟳  Refreshing locations...'),
@@ -85,7 +89,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 // Get buddy IDs to refresh
                 final buddyIds = buddies.map((b) => b.id).toList();
                 
-                await refreshService.refreshAll('my_id_placeholder', buddyIds);
+                await refreshService.refreshAll(myUserId, buddyIds);
                 
                 if (mounted) {
                   messenger.showSnackBar(
@@ -96,6 +100,60 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 }
               },
             ),
+
+            // ── Privacy / Sharing Active Indicator Banner ───────────────
+            if (isSharing)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryDark,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.freshGreen.withValues(alpha: 0.6)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.freshGreen,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '● SHARING ACTIVE — broadcasting location',
+                        style: AppTextStyles.radarLabel.copyWith(
+                          color: AppColors.freshGreen,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        ref.read(trackingServiceProvider).stopSharing();
+                        ref.read(isSharingLocationProvider.notifier).state = false;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Location sharing stopped')),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Text(
+                          'STOP',
+                          style: AppTextStyles.radarLabel.copyWith(
+                            color: AppColors.spiderRed,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // ── Update Notification Banner (if newer release exists) ───
             updateAsync.when(

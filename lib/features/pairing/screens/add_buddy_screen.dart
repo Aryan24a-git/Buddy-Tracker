@@ -66,6 +66,19 @@ class _AddBuddyScreenState extends ConsumerState<AddBuddyScreen> {
       final myUser = await ref.read(currentUserProvider.future);
       if (myUser != null) {
         final supabase = ref.read(supabaseServiceProvider);
+        
+        // Ensure both users exist in Supabase users table (satisfies foreign key)
+        await supabase.upsertUser(
+          id: myUser.id,
+          displayName: myUser.displayName,
+          publicKey: myUser.publicKey,
+        );
+        await supabase.upsertUser(
+          id: newBuddy.id,
+          displayName: nickname,
+          publicKey: _parsedData!['pk'] as String? ?? 'pub_key',
+        );
+
         await supabase.addBuddyRelationship(
           userId: myUser.id,
           buddyId: newBuddy.id,

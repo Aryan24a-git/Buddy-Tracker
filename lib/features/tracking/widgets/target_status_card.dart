@@ -131,13 +131,11 @@ class _StatsGrid extends StatelessWidget {
 
   String _transportLabel(LocationTransport t) => switch (t) {
         LocationTransport.internet => 'Internet',
-        LocationTransport.sms => 'SMS',
         LocationTransport.cache => 'Cache',
       };
 
   Color _transportColor(LocationTransport t) => switch (t) {
         LocationTransport.internet => AppColors.electricBlue,
-        LocationTransport.sms => AppColors.agingYellow,
         LocationTransport.cache => AppColors.staleRed,
       };
 }

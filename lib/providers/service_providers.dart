@@ -5,8 +5,7 @@ import 'package:buddy_tracker/services/supabase_service.dart';
 import 'package:buddy_tracker/services/transport_service.dart';
 import 'package:buddy_tracker/services/refresh_service.dart';
 import 'package:buddy_tracker/services/tracking_service.dart';
-
-import 'package:buddy_tracker/services/sms_service.dart';
+import 'package:buddy_tracker/services/connectivity_service.dart';
 import 'package:buddy_tracker/services/update_service.dart';
 
 /// Provides the local Drift database instance.
@@ -24,17 +23,15 @@ final supabaseServiceProvider = Provider<SupabaseService>((ref) {
   return SupabaseService();
 });
 
-/// Provides the SMS fallback engine.
-final smsServiceProvider = Provider<SmsService>((ref) {
-  return SmsService();
+/// Provides the Connectivity monitor.
+final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
+  return ConnectivityService();
 });
 
-/// Provides the Transport engine.
+/// Provides the Transport engine (internet-only, SMS removed).
 final transportServiceProvider = Provider<TransportService>((ref) {
   final supabaseService = ref.watch(supabaseServiceProvider);
-  final smsService = ref.watch(smsServiceProvider);
-  final database = ref.watch(databaseProvider);
-  return TransportService(supabaseService, smsService, database);
+  return TransportService(supabaseService);
 });
 
 /// Provides the Refresh manager (one-shot updates).
@@ -52,12 +49,13 @@ final refreshServiceProvider = Provider<RefreshService>((ref) {
   );
 });
 
-/// Provides the Tracking manager.
+/// Provides the Tracking manager (continuous location sharing).
 final trackingServiceProvider = Provider<TrackingService>((ref) {
-  final refreshService = ref.watch(refreshServiceProvider);
-  final database = ref.watch(databaseProvider);
+  final locationService = ref.watch(locationServiceProvider);
   final supabaseService = ref.watch(supabaseServiceProvider);
-  return TrackingService(refreshService, database, supabaseService);
+  final connectivityService = ref.watch(connectivityServiceProvider);
+  final database = ref.watch(databaseProvider);
+  return TrackingService(locationService, supabaseService, connectivityService, database);
 });
 
 /// Provides the GitHub update checker service.

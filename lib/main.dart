@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/theme.dart';
 import 'routing/app_router.dart';
-import 'package:buddy_tracker/providers/service_providers.dart';
-import 'package:buddy_tracker/providers/tracking_providers.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:buddy_tracker/services/supabase_service.dart';
@@ -85,22 +83,11 @@ class _BuddyTrackerAppState extends ConsumerState<BuddyTrackerApp> with WidgetsB
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || 
-        state == AppLifecycleState.detached || 
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.inactive) {
-      
-      // Stop the tracking loop
-      ref.read(trackingServiceProvider).stopTracking();
-      
-      // Reset the tracking UI state globally
-      ref.read(activeTrackingTargetProvider.notifier).state = null;
-      
-      // We don't automatically pop the router here; the go_router could be configured
-      // to redirect, or the active_tracking_screen could listen to activeTrackingTargetProvider 
-      // and pop if it becomes null. For Phase 8, ensuring the tracking loop stops and 
-      // state is reset is the hard rule.
-    }
+    // Note: With continuous background tracking via foreground service,
+    // we do NOT stop sharing when the app is backgrounded.
+    // The foreground service keeps location updates running.
+    // Only explicitly stopping via Settings toggle or the privacy indicator
+    // will stop sharing. This is the new design per architecture.md.
   }
 
   @override

@@ -59,10 +59,12 @@ jobs:
             - **`app-release.apk`** — Universal APK containing all architectures.
             
             #### 🛡️ Privacy & Architecture Features:
-            - **₹0 Infrastructure**: Drift SQLite local-first storage + Supabase cloud backend.
-            - **Spider-Sense Radar**: 500m concentric radar with real-time GPS forward-azimuth bearing.
-            - **Dual Transport**: Supabase cloud websocket with SMS fallback routing.
-            - **Zero Background Surveillance**: Polling stops immediately when minimized.
+            - **₹0 Infrastructure**: Drift SQLite local-first persistence + Supabase cloud database & realtime.
+            - **Spider-Sense Radar**: 500m concentric tactical radar with real-time GPS bearing.
+            - **Continuous Online Tracking**: Realtime mutual location updates with Android foreground service notification.
+            - **Offline Resilience**: Automatic last-known location caching with freshness indicators.
+            - **Instant Mutual Pairing**: Pair seamlessly via QR scan or 6-character Unique ID.
+            - **Full User Control**: Global "Stop Sharing My Location" switch in Settings & persistent Dashboard banner.
           files: |
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
             build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk

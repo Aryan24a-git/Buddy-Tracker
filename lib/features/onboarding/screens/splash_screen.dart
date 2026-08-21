@@ -51,6 +51,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       
       final db = ref.read(databaseProvider);
       final user = await db.usersDao.getFirstUser();
+      if (user != null) {
+        // Sync user to cloud to ensure foreign key integrity
+        try {
+          final supabase = ref.read(supabaseServiceProvider);
+          await supabase.upsertUser(
+            id: user.id,
+            displayName: user.displayName,
+            publicKey: user.publicKey,
+            phoneNumber: user.phoneNumber,
+            avatarUrl: user.avatarPath,
+          );
+        } catch (e) {
+          debugPrint('Splash cloud sync error: $e');
+        }
+      }
       
       if (mounted) {
         if (user != null) {

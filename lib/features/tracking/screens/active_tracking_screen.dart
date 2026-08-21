@@ -8,7 +8,6 @@ import 'package:buddy_tracker/features/tracking/widgets/target_status_card.dart'
 import 'package:buddy_tracker/models/buddy.dart';
 import 'package:buddy_tracker/providers/buddy_providers.dart';
 import 'package:buddy_tracker/providers/tracking_providers.dart';
-import 'package:buddy_tracker/providers/service_providers.dart';
 import 'package:buddy_tracker/routing/app_router.dart';
 
 /// Active Tracking Screen — design.md §6 Active Tracking Screen.
@@ -42,10 +41,9 @@ class _ActiveTrackingScreenState extends ConsumerState<ActiveTrackingScreen>
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
-    // Mark as actively tracking
+    // Mark as actively viewing this buddy
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(activeTrackingTargetProvider.notifier).state = widget.buddyId;
-      ref.read(trackingServiceProvider).startTracking(widget.buddyId);
     });
   }
 
@@ -57,7 +55,6 @@ class _ActiveTrackingScreenState extends ConsumerState<ActiveTrackingScreen>
 
   void _stopTracking(BuildContext context) {
     ref.read(activeTrackingTargetProvider.notifier).state = null;
-    ref.read(trackingServiceProvider).stopTracking();
     context.go(AppRoutes.dashboard);
   }
 

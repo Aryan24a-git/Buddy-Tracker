@@ -31,7 +31,7 @@ class LastLocations extends Table {
   DateTimeColumn get timestamp => dateTime()();
   RealColumn get speed => real().nullable()();
   RealColumn get heading => real().nullable()();
-  TextColumn get transport => text()(); // 'internet' | 'sms' | 'cache'
+  TextColumn get transport => text()(); // 'internet' | 'cache'
 
   @override
   Set<Column> get primaryKey => {buddyId};

@@ -24,18 +24,6 @@ final buddyListStreamProvider = StreamProvider<List<BuddyModel>>((ref) {
 
       LocationModel? location;
       if (locationData != null) {
-        LocationTransport transport;
-        switch (locationData.transport) {
-          case 'internet':
-            transport = LocationTransport.internet;
-            break;
-          case 'sms':
-            transport = LocationTransport.sms;
-            break;
-          default:
-            transport = LocationTransport.cache;
-        }
-
         location = LocationModel(
           buddyId: locationData.buddyId,
           latitude: locationData.latitude,
@@ -44,7 +32,7 @@ final buddyListStreamProvider = StreamProvider<List<BuddyModel>>((ref) {
           accuracy: locationData.accuracy,
           speed: locationData.speed,
           heading: locationData.heading,
-          transport: transport,
+          transport: LocationTransport.internet, // SMS removed — always internet
         );
       }
 
@@ -71,16 +59,4 @@ final selectedBuddyIdProvider = StateProvider<String?>((ref) => null);
 final currentUserProvider = FutureProvider<User?>((ref) async {
   final db = ref.watch(databaseProvider);
   return db.usersDao.getFirstUser();
-});
-
-/// Stream of incoming pending buddy requests from Supabase.
-final pendingBuddyRequestsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) async* {
-  final user = await ref.watch(currentUserProvider.future);
-  if (user == null) {
-    yield [];
-    return;
-  }
-  
-  final supabase = ref.watch(supabaseServiceProvider);
-  yield* supabase.subscribeToBuddyRequests(user.id);
 });

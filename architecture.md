@@ -12,8 +12,8 @@
 7. Spider-themed experience
 ```
 
-Foundation: **LOCAL-FIRST + ON-DEMAND LOCATION + TEMPORARY TRACKING + DUAL TRANSPORT +
-CACHED MAP + CONSENT.**
+Foundation: **LOCAL-FIRST + CONTINUOUS ONLINE TRACKING + LAST-KNOWN CACHING +
+CONSENT.**
 
 ## 2. Technology Stack
 
@@ -30,85 +30,87 @@ CACHED MAP + CONSENT.**
 | Map data          | OSM-compatible source     | ₹0 at appropriate free usage |
 | QR                | Flutter packages          | ₹0 |
 | GPS               | Android platform APIs     | ₹0 |
-| SMS fallback      | Android platform APIs     | No separate API server |
+| Connectivity      | connectivity_plus         | ₹0 |
 
-Costs the user still owns: normal carrier SMS charges (if any), optional Google Play developer
-fee for publishing (not required for sideloaded test APKs).
+Costs the user still owns: optional Google Play developer fee for publishing
+(not required for sideloaded test APKs).
 
 ## 3. Layered Architecture
 
 ```
 ┌──────────────────────────────────────────────────┐
 │                    UI LAYER                       │
-│  Dashboard │ Map │ Search │ Buddy │ Tracking       │
+│  Dashboard │ Map │ Search │ Buddy │ Settings       │
 └──────────────────────┬────────────────────────────┘
 ┌──────────────────────▼────────────────────────────┐
 │                APPLICATION LAYER                   │
 │  Buddy Manager │ Location Manager │ Refresh Manager │
-│  Tracking Manager │ Network Manager                │
+│  Tracking Manager │ Connectivity Manager           │
 └──────────────────────┬────────────────────────────┘
 ┌──────────────────────▼────────────────────────────┐
 │                 LOCATION ENGINE                    │
 │  GPS │ Accuracy │ Speed │ Heading │ Distance        │
+│  Position Stream │ (0,0) Guard                      │
 └──────────────────────┬────────────────────────────┘
 ┌──────────────────────▼────────────────────────────┐
 │                TRANSPORT ENGINE                     │
-│  Supabase │ SMS │ Retry │ Queue                     │
+│  Supabase │ Retry │ Cache                           │
 └──────────────────────┬────────────────────────────┘
-              ┌─────────┴─────────┐
-           Internet               SMS
-              │                    │
-           Supabase             Cellular
-              └─────────┬─────────┘
-                    Friend Device
+                    Internet
+                       │
+                    Supabase
+                       │
+                  Friend Device
 ```
 
 ## 4. Core Services & Responsibilities
 
-- **LocationManager**: `getCurrentLocation()`, `getAccuracy()`, `getSpeed()`, `getHeading()`,
-  `validateLocation()`.
-- **TrackingManager**: `startTracking()`, `requestLocation()`, `scheduleNextRequest()`,
-  `stopTracking()`, `handleAppLifecycle()` — owns the ~15s loop and the "minimize = stop" rule.
-- **RefreshManager**: `refreshAll()`, `requestBuddyLocation()`, `updateDatabase()` — one-shot only.
-- **TransportManager**: `sendLocation()`, `requestLocation()`, `selectTransport()`,
-  `handleRetry()` — the single decision point for Internet vs SMS vs cache.
-- **PairingManager**: `generateIdentity()`, `generateQR()`, `scanQR()`, `establishBuddy()`.
+- **LocationManager**: `getCurrentLocation()`, `getPositionStream()`,
+  `getAccuracy()`, `getSpeed()`, `getHeading()`, `validateLocation()`.
+  Guards against (0,0) coordinates from GPS failure.
+- **TrackingManager**: `startSharing()`, `stopSharing()`, `subscribeToBuddy()`.
+  Owns the continuous location broadcast loop. Runs as foreground service for
+  background operation.
+- **RefreshManager**: `refreshAll()`, `requestBuddyLocation()`,
+  `updateDatabase()` — one-shot sync.
+- **TransportService**: `sendLocation()`, `requestLocation()` — internet-only
+  transport to Supabase. When offline, locations are cached locally.
+- **ConnectivityService**: Monitors network state. On disconnect → cache mode.
+  On reconnect → resume cloud sync.
+- **PairingManager**: `generateIdentity()`, `generateQR()`, `scanQR()`,
+  `establishBuddy()` — instant mutual pairing, no pending/accept flow.
 
-## 5. Transport Manager Decision Logic
+## 5. Transport Decision Logic
 
 ```
-                 LOCATION REQUEST
-                        │
-                 Internet available?
-                    /          \
-                  YES           NO
-                   │             │
-              SUPABASE      SMS available?
-                                /      \
-                              YES       NO
-                               │         │
-                              SMS      CACHE
-                               └────┬────┘
-                              LOCATION RESULT
+               LOCATION UPDATE
+                      │
+               Internet available?
+                  /          \
+                YES           NO
+                 │             │
+            SUPABASE        CACHE
+                 │         (last-known)
+            LOCATION RESULT
 ```
 
-The UI only ever calls `requestLocation(friendId)`; transport selection is fully encapsulated.
+When connectivity returns, cached location is synced to cloud automatically.
 
 ## 6. State Machine (per buddy/session)
 
 ```
-CACHED LOCATION → (Refresh) → REFRESH → UPDATED → (Track Friend) → TRACKING ⟲ (~15s loop)
-                                                                        │
-                                                          (Stop / Background)
-                                                                        ▼
-                                                                     CACHED
+CACHED LOCATION → (Refresh) → REFRESH → UPDATED → (Continuous) → SHARING ⟲ (~15s loop)
+                                                                       │
+                                                         (Stop via Settings)
+                                                                       ▼
+                                                                    CACHED
 ```
 
 ## 7. Data Model
 
 ### Local database (Drift/SQLite)
 
-Tables: `users`, `buddies`, `last_locations`, `tracking_sessions`, `pending_requests`, `settings`.
+Tables: `users`, `buddies`, `last_locations`, `tracking_sessions`, `settings`.
 
 `last_locations` columns:
 ```
@@ -119,12 +121,13 @@ accuracy
 timestamp
 speed
 heading
-transport      -- 'internet' | 'sms' | 'cache'
+transport      -- 'internet' | 'cache'
 ```
 
 ### Cloud database (Supabase / Postgres)
 
-Suggested tables: `users`, `buddy_relationships`, `latest_locations`, `tracking_sessions`.
+Tables: `users`, `buddy_relationships`, `latest_locations`, `tracking_sessions`,
+`notifications`.
 Store only the **latest** location per user — do not persist an unbounded GPS history.
 
 ### Location object (transport payload)
@@ -132,14 +135,6 @@ Store only the **latest** location per user — do not persist an unbounded GPS 
 ```
 latitude, longitude, accuracy, timestamp, speed, heading, transport, sequence
 ```
-
-### SMS location packet (compact)
-
-```
-latitude, longitude, timestamp, sequence_number, accuracy, integrity_check (CRC)
-```
-CRC = corruption/integrity detection only, **not** authentication. Authentication relies on
-cryptographic keys established during QR pairing.
 
 ## 8. Distance & Nearby Logic
 
@@ -149,45 +144,49 @@ cryptographic keys established during QR pairing.
 
 ## 9. Identity, Pairing & Security Model
 
-- Identity: `User ID, Display Name, Phone Number, Public Key, Avatar`. Local nicknames are
-  private to the user who set them.
-- Pairing: physical QR exchange → identity verification → buddy relationship. QR payload is
-  minimal: `Protocol Version, Buddy ID, Public Key, Pairing Token` — no unnecessary sensitive data.
-- Authorization: only established buddies may request location per the app's permission model.
-- Tracking requires explicit user action; the tracked device must visibly indicate active sharing
-  (see design.md §9 privacy indicator). No silent/hidden surveillance path may exist.
+- Identity: `User ID (6-char short code), Display Name, Public Key`.
+  Local nicknames are private to the user who set them.
+- Pairing: physical QR exchange OR manual ID entry → **instant mutual link**.
+  Both directions created atomically. Informational in-app notification sent
+  ("X added you as a buddy"). No pending/accept flow.
+- QR payload: `Protocol Version, Buddy ID, Public Key, Pairing Token`.
+- Authorization: only established buddies may see location.
+- Privacy indicator: when sharing location, show a persistent, un-hideable
+  "● ACTIVE — sharing location" indicator with a stop-sharing control.
 
 ## 10. Battery & Network Strategy
 
 ```
 Normal mode : no tracking → no continuous GPS → no continuous network
 Refresh     : one sync → STOP
-Tracking    : one update → ~15s → repeat, only while foregrounded
-Background  : app minimized → STOP immediately
+Sharing ON  : continuous ~15s updates via foreground service (background OK)
+Sharing OFF : app not broadcasting → cached data only
+Offline     : last-known location cached, marked STALE, synced on reconnect
 ```
-Tracking interval is a configurable constant (default ~15s) — never hardcode sub-second polling.
+Tracking interval is a configurable constant (default ~15s).
 
 ## 11. Offline / Map Data
 
-- Map engine: MapLibre with OSM-compatible tiles. Cache the college campus region for offline use.
-- Public OSM tile servers are not an unlimited production backend — pick a free-tier provider
-  whose terms match the app's expected scale.
-- Two offline cases: (a) previously cached tiles → map still renders; (b) never-cached area →
-  detailed map may be unavailable; UI must communicate this rather than fail silently.
+- Map engine: MapLibre with OSM-compatible tiles. Cache the college campus region.
+- Two offline cases: (a) cached tiles → map still renders; (b) never-cached area →
+  detailed map may be unavailable; UI must communicate this.
+- When a buddy goes offline, their last-known location is cached locally and
+  displayed with freshness indicators (FRESH/AGING/STALE).
 
 ## 12. What Buddy Tracker Is / Is Not
 
-**Is**: a consent-based buddy location-sharing system for college students, local-first, with
-on-demand refresh, temporary explicit tracking, and dual transport (Internet + SMS fallback).
+**Is**: a consent-based buddy location-sharing system for college students,
+local-first, with on-demand refresh, continuous tracking with foreground service,
+and internet transport with last-known caching for offline resilience.
 
-**Is not**: 24/7 surveillance, a hidden tracker, an emergency/disaster-response replacement, or a
-system able to transmit location with zero communication path (GPS alone cannot reach another
-phone — a network path, Internet or SMS, is always required for remote sharing).
+**Is not**: 24/7 surveillance, a hidden tracker, an emergency/disaster-response
+replacement, or a system able to transmit location with zero communication path.
 
 ## 13. What NOT to Build in V1 (strict ₹0 MVP)
 
-Paid map APIs, Google Maps billing, Twilio, paid SMS gateways, paid VPS/databases, AI, chat,
-social feed, advertising, BLE mesh, Wi-Fi Direct, satellite communication, disaster-comm features.
+Paid map APIs, Google Maps billing, Twilio, paid SMS gateways, paid VPS/databases,
+AI, chat, social feed, advertising, BLE mesh, Wi-Fi Direct, satellite communication,
+disaster-comm features, SMS fallback transport.
 
 ## 14. Development Phases (build in this order)
 
@@ -195,23 +194,27 @@ social feed, advertising, BLE mesh, Wi-Fi Direct, satellite communication, disas
 Phase 1 — Design: theme, splash, dashboard, map, cards, radar, tracking UI
 Phase 2 — Local database: users, buddies, locations, tracking sessions
 Phase 3 — GPS: current location, accuracy, distance, speed, heading
-Phase 4 — QR pairing: generation, scanning, buddy relationship, nicknames
+Phase 4 — QR pairing: generation, scanning, instant mutual buddy relationship
 Phase 5 — Supabase: cloud database, realtime, location sync
 Phase 6 — Refresh: refresh → location → server → map
-Phase 7 — Active tracking: track → ~15s → update loop
-Phase 8 — Lifecycle: foreground → tracking; background → stop
-Phase 9 — SMS: internet-unavailable fallback (build & test last — most device-variable component)
+Phase 7 — Continuous tracking: foreground service → ~15s → update loop
+Phase 8 — Lifecycle: foreground service keeps running in background
+Phase 9 — Connectivity: last-known caching, online/offline state management
 ```
 
 ## 15. Testing Strategy (needs ≥2 physical Android devices)
 
-- **Test A — Internet**: both phones data ON → pairing, refresh, search, tracking, map, distance.
-- **Test B — Data OFF**: phone B data OFF, SMS available → refresh, tracking, SMS fallback.
-- **Test C — No comms**: data OFF + SMS unavailable → cached locations, offline map, stale-state UI.
-- **Test D — Minimize**: tracking → home → tracking OFF.
-- **Test E — Reopen**: open app → last location visible → tracking OFF.
+- **Test A — Internet**: both phones data ON → pairing, refresh, search, tracking, map.
+- **Test B — Data OFF**: phone B data OFF → cached locations, stale-state UI.
+- **Test C — Background**: tracking → home → verify foreground service keeps running.
+- **Test D — Reopen**: open app → last location visible, sharing state preserved.
+- **Test E — Stop Sharing**: toggle off in Settings → verify location stops broadcasting.
 
 ## 16. Permission Strategy
 
-Request Location and SMS permissions only when required for the feature being used, each with an
-in-UI explanation of why it's needed. Never request unrelated permissions.
+Two-step location permission request:
+1. First: `ACCESS_FINE_LOCATION` — for basic GPS functionality.
+2. Second: `ACCESS_BACKGROUND_LOCATION` — for foreground service background tracking.
+
+Each permission request includes an in-UI explanation of why it's needed.
+`FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_LOCATION` declared in manifest.

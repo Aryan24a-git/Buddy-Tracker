@@ -17,7 +17,7 @@ finding my buddies around campus."* Still a serious utility, not a game/gimmick.
 |----------------|-----------|-------|
 | Deep Black     | `#05070D` | Primary background |
 | Secondary Dark | `#101722` | Cards, sheets, elevated surfaces |
-| Spider Red     | `#E21B2D` | Primary accent, alerts, "TRACKING ACTIVE", stop actions |
+| Spider Red     | `#E21B2D` | Primary accent, alerts, "SHARING ACTIVE", stop actions |
 | Web Blue       | `#1479D1` | Secondary accent, buddy markers, links |
 | Electric Blue  | `#3FA9F5` | Highlights, active states, pulse rings |
 | White          | `#F5F7FA` | Primary text on dark surfaces |
@@ -37,7 +37,7 @@ family — no unrelated brand colors.
 - **Spider-web geometry**: subtle thin web-line patterns in empty states, backgrounds, radar
   screen, profile header, splash screen. Always subtle — never distracting from data.
 - **Radar rings**: concentric circles at 100m / 250m / 500m marking the Spider-Sense boundary.
-- **Tracking pulse**: selected/target marker emits a soft pulsing ring animation while tracking
+- **Tracking pulse**: selected/target marker emits a soft pulsing ring animation while sharing
   is active. Subtle, not flashy.
 - **Marker animation**: never snap a marker to a new position; interpolate/animate movement over
   roughly the update interval for a smooth radar feel.
@@ -47,10 +47,10 @@ family — no unrelated brand colors.
 | Label            | Meaning |
 |------------------|---------|
 | Spider Sense      | Nearby buddy detection (≤500m radar) |
-| Target            | The currently selected/tracked friend |
+| Target            | The currently viewed/focused friend |
 | Signal            | The latest location response |
 | Last Signal       | Timestamp of the last update |
-| Tracking Active   | Active tracking session in progress |
+| Sharing Active    | Location sharing is enabled |
 
 ## 6. Core Screens (reference layouts)
 
@@ -82,7 +82,7 @@ not the Marvel logo).
 │ 🕷 Rahul Mech               │
 │ Last Signal: 3.2 km         │
 │ Updated: 4 min ago          │
-│     [ TRACK FRIEND ]        │
+│     [ VIEW ON MAP ]         │
 └─────────────────────────────┘
 ```
 
@@ -93,26 +93,25 @@ not the Marvel logo).
 │ Last Signal      3.2 km        │
 │ Accuracy         ±12 m         │
 │ Updated          20 sec ago    │
-│       [ TRACK FRIEND ]         │
+│       [ VIEW ON MAP ]          │
 │       [ VIEW PROFILE ]         │
 └────────────────────────────────┘
 ```
 
-### Active Tracking Screen
+### Buddy View Screen
 ```
 ┌─────────────────────────────────────────┐
-│ ← RAHUL MECH              ● TRACKING   │
+│ ← RAHUL MECH            ● SHARING      │
 ├─────────────────────────────────────────┤
 │                  ◉ TARGET               │
 │                       ● YOU              │
 ├─────────────────────────────────────────┤
-│ TARGET STATUS                           │
+│ BUDDY STATUS                            │
 │ Distance       1.24 km                  │
 │ Speed          2.1 km/h                 │
 │ Accuracy       ±12 m                    │
 │ Last Signal    4 sec ago                │
-│ Transport      SMS                      │
-│       [ ■ STOP TRACKING ]               │
+│ Status         🟢 FRESH                │
 └─────────────────────────────────────────┘
 ```
 
@@ -120,10 +119,10 @@ not the Marvel logo).
 
 - **Empty state**: no buddies yet — friendly spider-web illustration + "Add your first buddy".
 - **No Signal state**: request sent, nothing received yet.
-- **Offline state**: no internet and no SMS path — cached data shown, clearly labeled stale.
+- **Offline state**: no internet — cached data shown, clearly labeled stale.
 - **Target status / signal indicator**:
-  - `ONLINE  ●●●●` — internet transport
-  - `SMS     ●●○○` — SMS fallback transport
+  - `ONLINE  ●●●●` — connected to internet, fresh data
+  - `CACHED  ●●○○` — using cached location
   - `STALE   ●○○○` — no fresh signal
   - Never imply bar count is a measured signal strength unless it truly is one.
 
@@ -139,17 +138,17 @@ Thresholds are configurable constants. Always show the raw timestamp alongside t
 
 ## 9. Components
 
-- **Buttons**: primary action = Spider Red fill (e.g. TRACK FRIEND, STOP TRACKING); secondary =
+- **Buttons**: primary action = Spider Red fill (e.g. STOP SHARING); secondary =
   Web Blue outline; both use the readable primary font, uppercase tracking-style labels sparingly.
 - **Cards**: Secondary Dark background, thin Web Blue/Electric Blue border or glow on selection.
 - **Markers**: "YOU" = white/electric blue dot; buddy = web-blue glyph; selected target = red
   pulsing ring.
-- **Privacy indicator**: when the user is being tracked by someone, show a persistent, un-hideable
+- **Privacy indicator**: when location sharing is active, show a persistent, un-hideable
   "● ACTIVE — sharing location" indicator with a stop-sharing control. Never hide this state.
 
 ## 10. Accessibility & Clarity Notes
 
 - Maintain sufficient contrast between Spider Red/Web Blue text and the Deep Black background.
-- Do not rely on color alone for freshness/transport state — always pair with a text label.
+- Do not rely on color alone for freshness state — always pair with a text label.
 - Keep spider-themed labels (Target, Signal, Spider Sense) paired with a plain-language tooltip
   or subtitle the first time a user encounters them.

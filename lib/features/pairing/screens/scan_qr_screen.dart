@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../providers/service_providers.dart';
 import '../../../providers/buddy_providers.dart';
+import 'package:buddy_tracker/database/app_database.dart';
 
 class ScanQrScreen extends ConsumerStatefulWidget {
   const ScanQrScreen({super.key});
@@ -67,7 +68,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
               final id = controller.text.trim().toUpperCase();
               Navigator.pop(context, id);
             },
-            child: const Text('SEND REQUEST', style: TextStyle(color: AppColors.deepBlack, fontWeight: FontWeight.bold)),
+            child: const Text('ADD BUDDY', style: TextStyle(color: AppColors.deepBlack, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -77,22 +78,58 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
         if (myUser != null) {
           try {
             final supabase = ref.read(supabaseServiceProvider);
-            // Send pending request (from me to them)
+            final db = ref.read(databaseProvider);
+
+            // Ensure both users exist in Supabase users table (satisfies foreign key)
+            await supabase.upsertUser(
+              id: myUser.id,
+              displayName: myUser.displayName,
+              publicKey: myUser.publicKey,
+            );
+            await supabase.upsertUser(
+              id: id,
+              displayName: 'Buddy $id',
+              publicKey: 'manual_key',
+            );
+
+            // Instant mutual link in Supabase (both directions)
             await supabase.addBuddyRelationship(
               userId: myUser.id,
               buddyId: id,
-              status: 'pending',
+              status: 'accepted',
             );
+            await supabase.addBuddyRelationship(
+              userId: id,
+              buddyId: myUser.id,
+              status: 'accepted',
+            );
+
+            // Add to local Drift DB
+            await db.buddiesDao.insertOrUpdateBuddy(
+              Buddy(id: id, publicKey: 'manual_entry'),
+            );
+
+            // Send in-app notification to the other user
+            try {
+              await supabase.sendNotification(
+                toUserId: id,
+                fromUserId: myUser.id,
+                message: '${myUser.displayName} added you as a buddy',
+              );
+            } catch (_) {
+              // Non-blocking — notification is informational only
+            }
+
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Buddy request sent to $id')),
+                SnackBar(content: Text('Buddy $id added!')),
               );
-              context.pop(); // Go back to dashboard
+              context.pop();
             }
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Failed to send request')),
+                SnackBar(content: Text('Failed to add buddy: $e')),
               );
             }
           }

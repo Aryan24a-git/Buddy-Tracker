@@ -253,7 +253,6 @@ class _TransportIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, bars, activeColor) = switch (transport) {
       LocationTransport.internet => ('ONLINE', 4, AppColors.electricBlue),
-      LocationTransport.sms => ('SMS', 2, AppColors.agingYellow),
       LocationTransport.cache => ('STALE', 1, AppColors.staleRed),
     };
 
