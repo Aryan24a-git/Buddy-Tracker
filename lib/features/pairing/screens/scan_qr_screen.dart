@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../providers/service_providers.dart';
+import '../../../providers/buddy_providers.dart';
 
-class ScanQrScreen extends StatefulWidget {
+class ScanQrScreen extends ConsumerStatefulWidget {
   const ScanQrScreen({super.key});
 
   @override
-  State<ScanQrScreen> createState() => _ScanQrScreenState();
+  ConsumerState<ScanQrScreen> createState() => _ScanQrScreenState();
 }
 
-class _ScanQrScreenState extends State<ScanQrScreen> {
+class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
   final MobileScannerController _scannerController = MobileScannerController();
   bool _isNavigating = false;
 
@@ -33,6 +36,69 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
         context.pushReplacement('/add_buddy', extra: qrData);
       }
     }
+  }
+
+  void _showManualEntryDialog() {
+    final controller = TextEditingController();
+    showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.secondaryDark,
+        title: Text('Enter Buddy ID', style: AppTextStyles.screenTitle),
+        content: TextField(
+          controller: controller,
+          style: AppTextStyles.bodyMedium,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            hintText: 'e.g. ABCDEF',
+            hintStyle: TextStyle(color: AppColors.whiteMuted),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.whiteMuted)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.electricBlue)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL', style: TextStyle(color: AppColors.whiteMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.electricBlue),
+            onPressed: () {
+              final id = controller.text.trim().toUpperCase();
+              Navigator.pop(context, id);
+            },
+            child: const Text('SEND REQUEST', style: TextStyle(color: AppColors.deepBlack, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((id) async {
+      if (id != null && id.isNotEmpty) {
+        final myUser = await ref.read(currentUserProvider.future);
+        if (myUser != null) {
+          try {
+            final supabase = ref.read(supabaseServiceProvider);
+            // Send pending request (from me to them)
+            await supabase.addBuddyRelationship(
+              userId: myUser.id,
+              buddyId: id,
+              status: 'pending',
+            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Buddy request sent to $id')),
+              );
+              context.pop(); // Go back to dashboard
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to send request')),
+              );
+            }
+          }
+        }
+      }
+    });
   }
 
   @override
@@ -81,14 +147,28 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
             ),
           ),
           Positioned(
-            bottom: 60,
+            bottom: 40,
             left: 0,
             right: 0,
-            child: Center(
-              child: Text(
-                'ALIGN QR CODE WITHIN FRAME',
-                style: AppTextStyles.radarLabel,
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'ALIGN QR CODE WITHIN FRAME',
+                  style: AppTextStyles.radarLabel,
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: _showManualEntryDialog,
+                  icon: const Icon(Icons.keyboard, color: AppColors.electricBlue),
+                  label: Text('ENTER ID MANUALLY', style: AppTextStyles.buttonSecondary),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.electricBlue),
+                    backgroundColor: AppColors.deepBlack.withValues(alpha: 0.7),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

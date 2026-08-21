@@ -7,6 +7,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:buddy_tracker/database/app_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/service_providers.dart';
+import '../../../providers/buddy_providers.dart';
 
 class AddBuddyScreen extends ConsumerStatefulWidget {
   final String qrData;
@@ -57,9 +58,25 @@ class _AddBuddyScreenState extends ConsumerState<AddBuddyScreen> {
         BuddiesCompanion.insert(
           id: newBuddy.id,
           nickname: Value(nickname),
-          publicKey: _parsedData!['publicKey'] as String? ?? '',
+          publicKey: _parsedData!['pk'] as String? ?? '', // FIXED from 'publicKey'
         ),
       );
+
+      // Create instant mutual link in Supabase
+      final myUser = await ref.read(currentUserProvider.future);
+      if (myUser != null) {
+        final supabase = ref.read(supabaseServiceProvider);
+        await supabase.addBuddyRelationship(
+          userId: myUser.id,
+          buddyId: newBuddy.id,
+          status: 'accepted',
+        );
+        await supabase.addBuddyRelationship(
+          userId: newBuddy.id,
+          buddyId: myUser.id,
+          status: 'accepted',
+        );
+      }
     } catch (e) {
       debugPrint('Database insert error: $e');
     }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:buddy_tracker/core/theme/theme.dart';
 import 'package:buddy_tracker/core/utils/freshness.dart';
+import 'package:buddy_tracker/core/utils/permission_utils.dart';
 import 'package:buddy_tracker/features/buddies/widgets/buddy_card.dart';
 import 'package:buddy_tracker/features/map/widgets/map_placeholder_widget.dart';
 import 'package:buddy_tracker/features/radar/widgets/spider_sense_radar.dart';
@@ -68,8 +69,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 context.push('/buddies');
               },
               onRefreshTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final refreshService = ref.read(refreshServiceProvider);
+                final hasPermission = await requestLocationPermission(context, ref);
+                
+                if (!hasPermission || !mounted) return;
+
                 // Phase 6: Call RefreshManager
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(
                     content: Text('⟳  Refreshing locations...'),
                   ),
@@ -78,10 +85,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 // Get buddy IDs to refresh
                 final buddyIds = buddies.map((b) => b.id).toList();
                 
-                await ref.read(refreshServiceProvider).refreshAll('my_id_placeholder', buddyIds);
+                await refreshService.refreshAll('my_id_placeholder', buddyIds);
                 
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (mounted) {
+                  messenger.showSnackBar(
                     const SnackBar(
                       content: Text('✓  Locations refreshed'),
                     ),
@@ -219,7 +226,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  void _onTrackTapped(BuddyModel buddy) {
+  void _onTrackTapped(BuddyModel buddy) async {
+    final hasPermission = await requestLocationPermission(context, ref);
+    if (!hasPermission || !mounted) return;
+
     ref.read(activeTrackingTargetProvider.notifier).state = buddy.id;
     context.go('/tracking/${buddy.id}');
   }

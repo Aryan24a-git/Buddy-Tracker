@@ -14,6 +14,7 @@ class BuddyCard extends StatelessWidget {
     this.myLat,
     this.myLon,
     this.onTrack,
+    this.onEditNickname,
     this.isSelected = false,
   });
 
@@ -25,6 +26,9 @@ class BuddyCard extends StatelessWidget {
 
   /// Called when "TRACK FRIEND" is tapped.
   final VoidCallback? onTrack;
+
+  /// Called when the edit icon is tapped.
+  final VoidCallback? onEditNickname;
 
   /// True when this buddy is the active tracking target.
   final bool isSelected;
@@ -102,19 +106,30 @@ class BuddyCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
 
-            // ── Track button ───────────────────────────────────────────
-            if (onTrack != null)
-              SizedBox(
-                width: 90,
-                child: ElevatedButton(
-                  onPressed: onTrack,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    textStyle: const TextStyle(fontSize: 11, letterSpacing: 1),
+            // ── Actions ────────────────────────────────────────────────
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (onEditNickname != null)
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 16, color: AppColors.whiteMuted),
+                    onPressed: onEditNickname,
+                    tooltip: 'Edit Nickname',
                   ),
-                  child: const Text('TRACK'),
-                ),
-              ),
+                if (onTrack != null)
+                  SizedBox(
+                    width: 75,
+                    child: ElevatedButton(
+                      onPressed: onTrack,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        textStyle: const TextStyle(fontSize: 10, letterSpacing: 1),
+                      ),
+                      child: const Text('TRACK'),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

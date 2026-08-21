@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:buddy_tracker/database/app_database.dart';
 import 'package:buddy_tracker/core/theme/theme.dart';
 import 'package:buddy_tracker/features/buddies/widgets/buddy_card.dart';
 import 'package:buddy_tracker/providers/buddy_providers.dart';
 import 'package:buddy_tracker/providers/tracking_providers.dart';
+import 'package:buddy_tracker/providers/service_providers.dart';
 
 /// Full Buddy List & Search screen.
 class BuddyListScreen extends ConsumerStatefulWidget {
@@ -77,6 +79,94 @@ class _BuddyListScreenState extends ConsumerState<BuddyListScreen> {
                 ),
               ),
             ),
+            // ── Pending Requests List ──────────────────────────────────────────
+            Consumer(
+              builder: (context, ref, child) {
+                final pendingRequestsAsync = ref.watch(pendingBuddyRequestsProvider);
+                
+                return pendingRequestsAsync.when(
+                  data: (requests) {
+                    if (requests.isEmpty) return const SizedBox.shrink();
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Text('PENDING REQUESTS', style: AppTextStyles.radarLabel.copyWith(color: AppColors.spiderRed)),
+                        ),
+                        ...requests.map((request) {
+                          final fromUserId = request['user_id'] as String;
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondaryDark,
+                              border: Border.all(color: AppColors.spiderRed),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person_add, color: AppColors.spiderRed),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Buddy Request', style: AppTextStyles.bodyMedium),
+                                      Text('ID: $fromUserId', style: AppTextStyles.radarLabel),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.check, color: AppColors.electricBlue),
+                                  onPressed: () async {
+                                    final myUser = await ref.read(currentUserProvider.future);
+                                    if (myUser != null) {
+                                      // Accept the request
+                                      final supabase = ref.read(supabaseServiceProvider);
+                                      await supabase.addBuddyRelationship(
+                                        userId: fromUserId,
+                                        buddyId: myUser.id,
+                                        status: 'accepted',
+                                      );
+                                      // And create the reverse relationship
+                                      await supabase.addBuddyRelationship(
+                                        userId: myUser.id,
+                                        buddyId: fromUserId,
+                                        status: 'accepted',
+                                      );
+                                      // Save to local database
+                                      final db = ref.read(databaseProvider);
+                                      await db.buddiesDao.insertOrUpdateBuddy(
+                                        Buddy(
+                                          id: fromUserId,
+                                          publicKey: 'unknown', // We don't have their PK via manual request yet
+                                        ),
+                                      );
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Buddy request accepted')),
+                                        );
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        const Divider(color: AppColors.divider, height: 16),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (err, stack) => const SizedBox.shrink(),
+                );
+              },
+            ),
+
+            // ── Buddy List ───────────────────────────────────────────────────
             Expanded(
               child: filtered.isEmpty
                   ? Center(
@@ -97,6 +187,51 @@ class _BuddyListScreenState extends ConsumerState<BuddyListScreen> {
                           onTrack: () {
                             ref.read(activeTrackingTargetProvider.notifier).state = buddy.id;
                             context.go('/tracking/${buddy.id}');
+                          },
+                          onEditNickname: () async {
+                            final controller = TextEditingController(text: buddy.nickname);
+                            final result = await showDialog<String>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: AppColors.secondaryDark,
+                                title: Text('Set Nickname', style: TextStyle(color: AppColors.white)),
+                                content: TextField(
+                                  controller: controller,
+                                  style: const TextStyle(color: AppColors.white),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Enter nickname...',
+                                    hintStyle: TextStyle(color: AppColors.whiteMuted),
+                                    enabledBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(color: AppColors.whiteMuted),
+                                    ),
+                                    focusedBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(color: AppColors.electricBlue),
+                                    ),
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('CANCEL', style: TextStyle(color: AppColors.whiteMuted)),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, ''), // Empty string to clear
+                                    child: const Text('CLEAR', style: TextStyle(color: AppColors.staleRed)),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.electricBlue),
+                                    onPressed: () => Navigator.pop(context, controller.text.trim()),
+                                    child: const Text('SAVE', style: TextStyle(color: AppColors.deepBlack, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (result != null) {
+                              final newNickname = result.isEmpty ? null : result;
+                              final db = ref.read(databaseProvider);
+                              await db.buddiesDao.updateNickname(buddy.id, newNickname);
+                            }
                           },
                         );
                       },

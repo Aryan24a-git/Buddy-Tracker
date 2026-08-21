@@ -56,7 +56,8 @@ final refreshServiceProvider = Provider<RefreshService>((ref) {
 final trackingServiceProvider = Provider<TrackingService>((ref) {
   final refreshService = ref.watch(refreshServiceProvider);
   final database = ref.watch(databaseProvider);
-  return TrackingService(refreshService, database);
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return TrackingService(refreshService, database, supabaseService);
 });
 
 /// Provides the GitHub update checker service.

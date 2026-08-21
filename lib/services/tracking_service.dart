@@ -4,23 +4,26 @@ import 'package:drift/drift.dart';
 import 'package:buddy_tracker/core/constants/app_constants.dart';
 import 'package:buddy_tracker/services/refresh_service.dart';
 import 'package:buddy_tracker/database/app_database.dart';
+import 'package:buddy_tracker/services/supabase_service.dart';
 
 /// TrackingManager implementation per architecture.md §4 and §10.
 /// Owns the ~15s loop for active tracking.
 class TrackingService {
   final RefreshService _refreshService;
   final AppDatabase _database;
+  final SupabaseService _supabaseService;
   
   bool _isTracking = false;
   String? _activeTargetId;
   Timer? _trackingTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
   
-  TrackingService(this._refreshService, this._database);
+  TrackingService(this._refreshService, this._database, this._supabaseService);
 
   bool get isTracking => _isTracking;
   String? get activeTargetId => _activeTargetId;
 
-  /// Starts tracking the given buddy with a ~15s loop.
+  /// Starts tracking the given buddy with a ~15s loop and realtime subscription.
   void startTracking(String buddyId) {
     if (_isTracking && _activeTargetId == buddyId) return;
     
@@ -37,9 +40,30 @@ class TrackingService {
     // Perform initial immediate request
     _requestUpdate();
     
-    // Schedule loop
+    // Schedule loop for pushing our own location
     _trackingTimer = Timer.periodic(AppConstants.trackingInterval, (_) {
       _requestUpdate();
+    });
+
+    // Subscribe to realtime location updates from Supabase
+    _realtimeSubscription = _supabaseService.subscribeToBuddyLocation(buddyId).listen((loc) async {
+      debugPrint('Realtime update received for buddy $buddyId');
+      try {
+        await _database.into(_database.lastLocations).insertOnConflictUpdate(
+          LastLocationsCompanion.insert(
+            buddyId: buddyId,
+            latitude: (loc['latitude'] as num).toDouble(),
+            longitude: (loc['longitude'] as num).toDouble(),
+            accuracy: (loc['accuracy'] as num).toDouble(),
+            timestamp: DateTime.parse(loc['timestamp'] as String).toLocal(),
+            speed: Value(loc['speed'] != null ? (loc['speed'] as num).toDouble() : null),
+            heading: Value(loc['heading'] != null ? (loc['heading'] as num).toDouble() : null),
+            transport: 'internet',
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error inserting realtime location: $e');
+      }
     });
   }
 
@@ -51,6 +75,9 @@ class TrackingService {
     
     _trackingTimer?.cancel();
     _trackingTimer = null;
+    
+    _realtimeSubscription?.cancel();
+    _realtimeSubscription = null;
     
     if (_activeTargetId != null) {
       _logSessionEnd(_activeTargetId!);

@@ -32,8 +32,8 @@ class SupabaseService {
       'id': id,
       'display_name': displayName,
       'public_key': publicKey,
-      'phone_number': ?phoneNumber,
-      'avatar_url': ?avatarUrl,
+      'phone_number': phoneNumber,
+      'avatar_url': avatarUrl,
     });
   }
 
@@ -51,6 +51,34 @@ class SupabaseService {
       'buddy_id': buddyId,
       'status': status,
     });
+  }
+
+  /// Subscribes to incoming buddy requests where this user is the target (buddy_id).
+  Stream<List<Map<String, dynamic>>> subscribeToBuddyRequests(String myUserId) {
+    return _client
+        .from('buddy_relationships')
+        .stream(primaryKey: ['id'])
+        .eq('buddy_id', myUserId)
+        .eq('status', 'pending');
+  }
+
+  /// Subscribes to accepted relationships where this user is the requester (user_id).
+  Stream<List<Map<String, dynamic>>> subscribeToAcceptedRequests(String myUserId) {
+    return _client
+        .from('buddy_relationships')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', myUserId)
+        .eq('status', 'accepted');
+  }
+
+  /// Fetches accepted relationships where this user is the requester.
+  Future<List<Map<String, dynamic>>> getAcceptedRequests(String myUserId) async {
+    final response = await _client
+        .from('buddy_relationships')
+        .select()
+        .eq('user_id', myUserId)
+        .eq('status', 'accepted');
+    return List<Map<String, dynamic>>.from(response);
   }
 
   // ── Latest Locations Table ─────────────────────────────────────────────
@@ -78,6 +106,18 @@ class SupabaseService {
       'transport': transport,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     });
+  }
+
+  /// Fetches the latest locations for a list of buddies.
+  Future<List<Map<String, dynamic>>> getLatestLocations(List<String> buddyIds) async {
+    if (buddyIds.isEmpty) return [];
+    
+    final response = await _client
+        .from('latest_locations')
+        .select()
+        .inFilter('buddy_id', buddyIds);
+        
+    return List<Map<String, dynamic>>.from(response);
   }
 
   /// Subscribes to realtime updates on the `latest_locations` table for a specific buddy.

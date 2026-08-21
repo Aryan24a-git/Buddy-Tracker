@@ -1,23 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../services/pairing_service.dart';
+import '../../../providers/buddy_providers.dart';
 
-class MyQrScreen extends StatelessWidget {
+class MyQrScreen extends ConsumerWidget {
   const MyQrScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Generate dummy payload for now since identity generation is in pairing_service
-    // but not yet connected to Riverpod/Database state.
-    final pairingService = PairingService();
-    final qrPayload = pairingService.generateQRPayload(
-      myBuddyId: 'user_123',
-      publicKey: 'pub_key_xyz',
-      pairingToken: 'token_789',
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
       backgroundColor: AppColors.deepBlack,
@@ -29,10 +24,25 @@ class MyQrScreen extends StatelessWidget {
           onPressed: () => context.pop(),
         ),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      body: userAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.electricBlue)),
+        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: AppColors.staleRed))),
+        data: (user) {
+          if (user == null) {
+            return Center(child: Text('User profile not found', style: AppTextStyles.bodyMedium));
+          }
+
+          final pairingService = PairingService();
+          final qrPayload = pairingService.generateQRPayload(
+            myBuddyId: user.id,
+            publicKey: user.publicKey,
+            pairingToken: 'token_${DateTime.now().millisecondsSinceEpoch}', // Dummy ephemeral token
+          );
+
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
             Text(
               'Have your buddy scan this',
               style: AppTextStyles.bodyMedium.copyWith(color: AppColors.whiteMuted),
@@ -72,6 +82,8 @@ class MyQrScreen extends StatelessWidget {
             ),
           ],
         ),
+      );
+      },
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:buddy_tracker/database/app_database.dart';
 import 'package:buddy_tracker/services/location_service.dart';
 import 'package:buddy_tracker/services/transport_service.dart';
@@ -28,18 +29,17 @@ class RefreshService {
     try {
       // 1. Get own GPS
       final currentLocation = await _locationService.getCurrentLocation();
-      if (currentLocation != null) {
-        // Broadcast our location to the transport layer
-        await _transportService.sendLocation(
-          buddyId: myBuddyId,
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          accuracy: currentLocation.accuracy ?? 0.0,
-          timestamp: currentLocation.timestamp,
-          speed: currentLocation.speed,
-          heading: currentLocation.heading,
-        );
-      }
+      
+      // Broadcast our location to the transport layer
+      await _transportService.sendLocation(
+        buddyId: myBuddyId,
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        accuracy: currentLocation.accuracy ?? 0.0,
+        timestamp: currentLocation.timestamp,
+        speed: currentLocation.speed,
+        heading: currentLocation.heading,
+      );
     } catch (e) {
       debugPrint('Error getting own location during refresh: $e');
     }
@@ -49,11 +49,27 @@ class RefreshService {
       await requestBuddyLocation(buddyId);
     }
     
-    // In a real implementation with Supabase, we would do a direct query to latest_locations
-    // to fetch the latest state of all buddies for the one-shot refresh.
-    // For Phase 6, we'll simulate an update loop if necessary, or let Supabase realtime
-    // streams handle the database updates.
-    await updateDatabase();
+    // 3. Sync accepted buddy relationships
+    try {
+      final acceptedRequests = await _supabaseService.getAcceptedRequests(myBuddyId);
+      for (final req in acceptedRequests) {
+        final buddyId = req['buddy_id'] as String?;
+        if (buddyId != null) {
+          // Add to local database if not exists
+          final existing = await _database.buddiesDao.getBuddy(buddyId);
+          if (existing == null) {
+             await _database.buddiesDao.insertOrUpdateBuddy(
+               Buddy(id: buddyId, publicKey: 'unknown'),
+             );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error syncing accepted buddies: $e');
+    }
+    
+    // 4. Update the local database with latest from cloud
+    await updateDatabase(myBuddies);
   }
 
   /// Requests a specific buddy's location via the transport engine.
@@ -61,10 +77,30 @@ class RefreshService {
     await _transportService.requestLocation(buddyId);
   }
 
-  /// Updates the local database with fetched locations.
-  Future<void> updateDatabase() async {
-    // Phase 6 placeholder: Supabase fetching and Drift updating logic.
-    // We would query Supabase for latest_locations of our buddies and update Drift.
-    debugPrint('Database updated from RefreshService using ${_database.runtimeType} and ${_supabaseService.runtimeType}');
+  /// Updates the local database with fetched locations from Supabase.
+  Future<void> updateDatabase(List<String> buddyIds) async {
+    try {
+      final latestLocations = await _supabaseService.getLatestLocations(buddyIds);
+      
+      for (final loc in latestLocations) {
+        final buddyId = loc['buddy_id'] as String?;
+        if (buddyId == null) continue;
+        
+        await _database.into(_database.lastLocations).insertOnConflictUpdate(
+          LastLocationsCompanion.insert(
+            buddyId: buddyId,
+            latitude: (loc['latitude'] as num).toDouble(),
+            longitude: (loc['longitude'] as num).toDouble(),
+            accuracy: (loc['accuracy'] as num).toDouble(),
+            timestamp: DateTime.parse(loc['timestamp'] as String).toLocal(),
+            speed: Value(loc['speed'] != null ? (loc['speed'] as num).toDouble() : null),
+            heading: Value(loc['heading'] != null ? (loc['heading'] as num).toDouble() : null),
+            transport: loc['transport'] as String? ?? 'internet',
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating database from Supabase: $e');
+    }
   }
 }

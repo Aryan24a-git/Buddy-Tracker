@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:buddy_tracker/models/buddy.dart';
 import 'package:buddy_tracker/models/location.dart';
 import 'package:buddy_tracker/providers/service_providers.dart';
+import 'package:buddy_tracker/database/app_database.dart';
 
 /// Reactive provider that streams real buddies and their latest locations directly from Drift SQLite.
 final buddyListStreamProvider = StreamProvider<List<BuddyModel>>((ref) {
@@ -65,3 +66,21 @@ final buddyListProvider = Provider<List<BuddyModel>>((ref) {
 
 /// Selected buddy ID for active tracking.
 final selectedBuddyIdProvider = StateProvider<String?>((ref) => null);
+
+/// Provides the current local user identity.
+final currentUserProvider = FutureProvider<User?>((ref) async {
+  final db = ref.watch(databaseProvider);
+  return db.usersDao.getFirstUser();
+});
+
+/// Stream of incoming pending buddy requests from Supabase.
+final pendingBuddyRequestsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) async* {
+  final user = await ref.watch(currentUserProvider.future);
+  if (user == null) {
+    yield [];
+    return;
+  }
+  
+  final supabase = ref.watch(supabaseServiceProvider);
+  yield* supabase.subscribeToBuddyRequests(user.id);
+});

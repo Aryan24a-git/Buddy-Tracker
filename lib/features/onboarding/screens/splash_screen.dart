@@ -5,17 +5,20 @@ import 'package:buddy_tracker/core/theme/theme.dart';
 import 'package:buddy_tracker/routing/app_router.dart';
 import '../widgets/web_geometry_painter.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:buddy_tracker/providers/service_providers.dart';
+
 /// Splash screen — design.md §6.
 /// Spider-web geometry background + 🕷 BUDDY TRACKER wordmark.
-/// Auto-navigates to Dashboard after a short delay.
-class SplashScreen extends StatefulWidget {
+/// Auto-navigates to Dashboard or Onboarding after a short delay.
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
@@ -42,9 +45,20 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Navigate to dashboard after splash.
-    Future.delayed(const Duration(milliseconds: 2600), () {
-      if (mounted) context.go(AppRoutes.dashboard);
+    // Check user and navigate
+    Future.delayed(const Duration(milliseconds: 2600), () async {
+      if (!mounted) return;
+      
+      final db = ref.read(databaseProvider);
+      final user = await db.usersDao.getFirstUser();
+      
+      if (mounted) {
+        if (user != null) {
+          context.go(AppRoutes.dashboard);
+        } else {
+          context.go('/onboarding');
+        }
+      }
     });
   }
 

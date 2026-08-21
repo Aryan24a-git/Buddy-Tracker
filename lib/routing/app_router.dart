@@ -9,9 +9,12 @@ import 'package:buddy_tracker/features/pairing/screens/scan_qr_screen.dart';
 import 'package:buddy_tracker/features/pairing/screens/add_buddy_screen.dart';
 import 'package:buddy_tracker/features/buddies/screens/buddy_list_screen.dart';
 
+import 'package:buddy_tracker/features/onboarding/screens/onboarding_screen.dart';
+
 /// Named route paths.
 abstract class AppRoutes {
   static const String splash = '/';
+  static const String onboarding = '/onboarding';
   static const String dashboard = '/dashboard';
   static const String tracking = '/tracking/:buddyId';
   static const String myQr = '/my_qr';
@@ -28,6 +31,11 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.splash,
       builder: (BuildContext context, GoRouterState state) =>
           const SplashScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.onboarding,
+      builder: (BuildContext context, GoRouterState state) =>
+          const OnboardingScreen(),
     ),
     GoRoute(
       path: AppRoutes.dashboard,

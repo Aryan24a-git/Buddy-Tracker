@@ -19,6 +19,11 @@ class BuddiesDao extends DatabaseAccessor<AppDatabase> with _$BuddiesDaoMixin {
   Future<void> insertOrUpdateBuddy(Buddy buddy) =>
       into(buddies).insertOnConflictUpdate(buddy);
 
+  Future<void> updateNickname(String id, String? nickname) =>
+      (update(buddies)..where((b) => b.id.equals(id))).write(
+        BuddiesCompanion(nickname: Value(nickname)),
+      );
+
   Future<void> deleteBuddy(String id) =>
       (delete(buddies)..where((b) => b.id.equals(id))).go();
 }

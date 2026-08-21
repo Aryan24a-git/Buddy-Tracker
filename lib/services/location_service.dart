@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-
+import '../core/errors/app_errors.dart';
 import '../models/location.dart' as app;
-
 /// LocationManager implementation per architecture.md §4.
 /// Handles current location, accuracy, speed, heading, and validation.
 class LocationService {
@@ -13,25 +13,28 @@ class LocationService {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      throw Exception('Location services are disabled.');
+      throw const LocationError('Location services are disabled.');
     }
 
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception('Location permissions are denied');
-      }
+      throw const LocationError('PERMISSION_DENIED');
     }
 
     if (permission == LocationPermission.deniedForever) {
-      throw Exception(
+      throw const LocationError(
           'Location permissions are permanently denied, we cannot request permissions.');
     }
   }
 
-  /// Returns the current device location (as a Buddy Tracker Location model).
-  Future<app.LocationModel?> getCurrentLocation() async {
+  /// Requests permission from the OS. Should be called by UI after showing rationale.
+  Future<bool> requestPermission() async {
+    final permission = await Geolocator.requestPermission();
+    return permission == LocationPermission.whileInUse ||
+           permission == LocationPermission.always;
+  }
+
+  Future<app.LocationModel> getCurrentLocation() async {
     try {
       await _checkPermissions();
       final Position position = await Geolocator.getCurrentPosition(
@@ -51,28 +54,30 @@ class LocationService {
         heading: position.heading,
         transport: app.LocationTransport.internet, // Defaulting to internet for local GPS source
       );
+    } on TimeoutException {
+      throw const LocationError('Location request timed out. No signal.');
     } catch (e) {
-      // Return null on failure or if permissions denied
-      return null;
+      if (e is LocationError) rethrow;
+      throw LocationError('Failed to get location: $e');
     }
   }
 
   /// Returns the estimated accuracy (in meters) of the current location.
   Future<double?> getAccuracy() async {
     final loc = await getCurrentLocation();
-    return loc?.accuracy;
+    return loc.accuracy;
   }
 
   /// Returns the current speed (in m/s).
   Future<double?> getSpeed() async {
     final loc = await getCurrentLocation();
-    return loc?.speed;
+    return loc.speed;
   }
 
   /// Returns the current heading (in degrees).
   Future<double?> getHeading() async {
     final loc = await getCurrentLocation();
-    return loc?.heading;
+    return loc.heading;
   }
 
   /// Validates a location (e.g. checks if it's within bounds or not spoofed/invalid).
